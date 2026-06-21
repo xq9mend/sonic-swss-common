@@ -330,9 +330,12 @@ TEST(Notifications, LruDedupPolicyConstructorAndLabelPropagation)
     send("fdb_event");
     send("fdb_event");    // byte-identical to first -- LruDedup should collapse
 
-    // Drain so processReply is invoked.
+    // Drain until stats.received reflects both messages.  A simple "stop at
+    // first pops" loop is racy: the second Redis message may not have been
+    // consumed by readData() yet when we drain the first one.  Loop until
+    // both have been received (or we time out after 5 s).
     size_t pops = 0;
-    for (int i = 0; i < 50 && pops == 0; ++i) {
+    for (int i = 0; i < 50 && nc.getStats().received < 2u; ++i) {
         swss::Selectable *sel = nullptr;
         if (s.select(&sel, 100 /* ms */) == swss::Select::TIMEOUT) continue;
         std::deque<swss::KeyOpFieldsValuesTuple> vkco;
