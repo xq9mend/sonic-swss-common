@@ -760,22 +760,22 @@ SonicDBKey DBConnector::getDBKey() const
 
 DBConnector *DBConnector::newConnector(unsigned int timeout) const
 {
-    DBConnector *ret;
+    unique_ptr<DBConnector> ret;
 
     if (getContext()->connection_type == REDIS_CONN_TCP)
-        ret = new DBConnector(getDbId(),
-                               getContext()->tcp.host,
-                               getContext()->tcp.port,
-                               timeout);
+        ret.reset(new DBConnector(getDbId(),
+                                  getContext()->tcp.host,
+                                  getContext()->tcp.port,
+                                  timeout));
     else
-        ret = new DBConnector(getDbId(),
-                               getContext()->unix_sock.path,
-                               timeout);
+        ret.reset(new DBConnector(getDbId(),
+                                  getContext()->unix_sock.path,
+                                  timeout));
 
     ret->m_dbName = m_dbName;
     ret->setDBKey(getDBKey());
 
-    return ret;
+    return ret.release();
 }
 
 PubSub *DBConnector::pubsub()

@@ -294,7 +294,7 @@ void DBInterface::_subscribe_keyspace_notification(const std::string& dbName)
 {
     SWSS_LOG_DEBUG("Subscribe to keyspace notification");
     auto& client = m_redisClient.at(dbName);
-    DBConnector *pubsub = client.newConnector(0);
+    std::shared_ptr<DBConnector> pubsub(client.newConnector(0));
     pubsub->psubscribe(KEYSPACE_PATTERN);
 
     // Set the timeout of the pubsub channel, so future redisGetReply will be impacted
@@ -305,7 +305,7 @@ void DBInterface::_subscribe_keyspace_notification(const std::string& dbName)
         throw RedisError("Failed to redisSetTimeout", pubsub->getContext());
     }
 
-    keyspace_notification_channels.emplace(std::piecewise_construct, std::forward_as_tuple(dbName), std::forward_as_tuple(pubsub));
+    keyspace_notification_channels.emplace(dbName, std::move(pubsub));
 }
 
 // In the event Redis is unavailable, close existing connections, and try again.

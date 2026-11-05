@@ -261,6 +261,9 @@ protected:
      * */
     std::string stripSpecialSym(const std::string &key);
     std::string m_shaDump;
+
+private:
+    Table(std::unique_ptr<RedisPipeline> pipeline, const std::string &tableName);
 };
 
 class TableName_KeyValueOpQueues {

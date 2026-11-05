@@ -33,9 +33,15 @@ const TableNameSeparatorMap TableBase::tableNameSeparatorMap = {
 };
 
 Table::Table(const DBConnector *db, const string &tableName)
-    : Table(new RedisPipeline(db, 1), tableName, false)
+    : Table(std::unique_ptr<RedisPipeline>(new RedisPipeline(db, 1)), tableName)
+{
+}
+
+Table::Table(std::unique_ptr<RedisPipeline> pipeline, const string &tableName)
+    : Table(pipeline.get(), tableName, false)
 {
     m_pipeowned = true;
+    pipeline.release();
 }
 
 Table::Table(RedisPipeline *pipeline, const string &tableName, bool buffered)

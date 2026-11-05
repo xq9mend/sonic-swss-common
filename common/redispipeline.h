@@ -6,6 +6,7 @@
 #include <functional>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include "redisreply.h"
 #include "rediscommand.h"
 #include "dbconnector.h"
@@ -27,7 +28,7 @@ public:
         , m_remaining(0)
         , m_shaPub("")
     {
-        m_db = db->newConnector(NEWCONNECTOR_TIMEOUT);
+        m_db.reset(db->newConnector(NEWCONNECTOR_TIMEOUT));
         initializeOwnerTid();
         lastHeartBeat = std::chrono::steady_clock::now();
     }
@@ -54,7 +55,6 @@ public:
                 SWSS_LOG_NOTICE("RedisPipeline dtor is called from another thread, possibly due to exit(), Database: %s", dbName.c_str());
             }
 
-            delete m_db;
         }
         catch (const std::exception& e)
         {
@@ -89,7 +89,7 @@ public:
             default:
             {
                 flush();
-                RedisReply r(m_db, command, expectedType);
+                RedisReply r(m_db.get(), command, expectedType);
                 return r.release();
             }
         }
@@ -98,7 +98,7 @@ public:
     redisReply *push(const RedisCommand& command)
     {
         flush();
-        RedisReply r(m_db, command);
+        RedisReply r(m_db.get(), command);
         return r.release();
     }
 
@@ -170,7 +170,7 @@ public:
 
     DBConnector *getDBConnector()
     {
-        return m_db;
+        return m_db.get();
     }
 
     void initializeOwnerTid()
@@ -201,11 +201,11 @@ public:
         cmd.format(
             "EVALSHA %s 0",
             m_shaPub.c_str());
-        RedisReply r(m_db, cmd);
+        RedisReply r(m_db.get(), cmd);
     }
 
 private:
-    DBConnector *m_db;
+    std::unique_ptr<DBConnector> m_db;
     std::queue<int> m_expectedTypes;
     size_t m_remaining;
     long int m_ownerTid;

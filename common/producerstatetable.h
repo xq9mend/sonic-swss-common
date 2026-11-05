@@ -52,6 +52,8 @@ public:
 
     void apply_temp_view();
 private:
+    ProducerStateTable(std::unique_ptr<RedisPipeline> pipeline, const std::string &tableName);
+
     bool m_flushPub; // publish per piepeline flush intead of per redis script
     bool m_buffered;
     bool m_pipeowned;

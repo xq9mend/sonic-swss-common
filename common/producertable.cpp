@@ -13,9 +13,15 @@ using json = nlohmann::json;
 namespace swss {
 
 ProducerTable::ProducerTable(DBConnector *db, const string &tableName)
-    : ProducerTable(new RedisPipeline(db, 1), tableName, false)
+    : ProducerTable(std::unique_ptr<RedisPipeline>(new RedisPipeline(db, 1)), tableName)
+{
+}
+
+ProducerTable::ProducerTable(std::unique_ptr<RedisPipeline> pipeline, const string &tableName)
+    : ProducerTable(pipeline.get(), tableName, false)
 {
     m_pipeowned = true;
+    pipeline.release();
 }
 
 ProducerTable::ProducerTable(RedisPipeline *pipeline, const string &tableName, bool buffered)

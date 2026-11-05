@@ -14,9 +14,15 @@ using namespace std;
 namespace swss {
 
 ProducerStateTable::ProducerStateTable(DBConnector *db, const string &tableName)
-    : ProducerStateTable(new RedisPipeline(db, 1), tableName, false, false)
+    : ProducerStateTable(std::unique_ptr<RedisPipeline>(new RedisPipeline(db, 1)), tableName)
+{
+}
+
+ProducerStateTable::ProducerStateTable(std::unique_ptr<RedisPipeline> pipeline, const string &tableName)
+    : ProducerStateTable(pipeline.get(), tableName, false, false)
 {
     m_pipeowned = true;
+    pipeline.release();
 }
 
 ProducerStateTable::ProducerStateTable(RedisPipeline *pipeline, const string &tableName, bool buffered)

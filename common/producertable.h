@@ -2,6 +2,7 @@
 #define __PRODUCERTABLE__
 
 #include <fstream>
+#include <memory>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -49,6 +50,8 @@ public:
     void flush();
 
 private:
+    ProducerTable(std::unique_ptr<RedisPipeline> pipeline, const std::string &tableName);
+
     /* Disable copy-constructor and operator = */
     ProducerTable(const ProducerTable &other);
     ProducerTable & operator = (const ProducerTable &other);
