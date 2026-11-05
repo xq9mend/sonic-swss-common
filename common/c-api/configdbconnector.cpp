@@ -54,12 +54,10 @@ SWSSResult SWSSConfigDBConnector_get_table(SWSSConfigDBConnector configDb, const
     SWSSTry({
         auto table_map = ((ConfigDBConnector_Native *)configDb)->get_table(string(table));
 
-        // Convert map<string, map<string, string>> to vector<SWSSKeyOpFieldValues>
-        vector<SWSSKeyOpFieldValues> table_entries;
-        table_entries.reserve(table_map.size());
+        ConvertedArray<SWSSKeyOpFieldValues> table_entries(table_map.size());
 
         for (auto &entry : table_map) {
-            SWSSKeyOpFieldValues kfv_entry;
+            auto &kfv_entry = table_entries.data[table_entries.len++];
             kfv_entry.key = strdup(entry.first.c_str());
             kfv_entry.operation = SWSSKeyOperation_SET; // ConfigDB entries are always SET operations
 
@@ -70,19 +68,11 @@ SWSSResult SWSSConfigDBConnector_get_table(SWSSConfigDBConnector configDb, const
                 pairs.push_back(make_pair(field_pair.first, move(field_pair.second)));
             }
             kfv_entry.fieldValues = makeFieldValueArray(std::move(pairs));
-
-            table_entries.push_back(kfv_entry);
-        }
-
-        // Convert to SWSSKeyOpFieldValuesArray
-        SWSSKeyOpFieldValues *data = new SWSSKeyOpFieldValues[table_entries.size()];
-        for (size_t i = 0; i < table_entries.size(); i++) {
-            data[i] = table_entries[i];
         }
 
         SWSSKeyOpFieldValuesArray out;
-        out.len = (uint64_t)table_entries.size();
-        out.data = data;
+        out.len = (uint64_t)table_entries.len;
+        out.data = table_entries.release();
         *outTable = out;
     });
 }
@@ -134,19 +124,17 @@ SWSSResult SWSSConfigDBConnector_get_config(SWSSConfigDBConnector configDb, SWSS
         auto config_map = ((ConfigDBConnector_Native *)configDb)->get_config();
 
         // Convert map<string, map<string, map<string, string>>> to SWSSConfigMap
-        vector<SWSSConfigTable> config_tables;
-        config_tables.reserve(config_map.size());
+        ConvertedArray<SWSSConfigTable> config_tables(config_map.size());
 
         for (auto &table_entry : config_map) {
-            SWSSConfigTable config_table;
+            auto &config_table = config_tables.data[config_tables.len++];
             config_table.table_name = strdup(table_entry.first.c_str());
 
             // Convert map<string, map<string, string>> to SWSSKeyOpFieldValuesArray
-            vector<SWSSKeyOpFieldValues> table_entries;
-            table_entries.reserve(table_entry.second.size());
+            ConvertedArray<SWSSKeyOpFieldValues> table_entries(table_entry.second.size());
 
             for (auto &key_entry : table_entry.second) {
-                SWSSKeyOpFieldValues kfv_entry;
+                auto &kfv_entry = table_entries.data[table_entries.len++];
                 kfv_entry.key = strdup(key_entry.first.c_str());
                 kfv_entry.operation = SWSSKeyOperation_SET; // Config entries are always SET operations
 
@@ -157,29 +145,13 @@ SWSSResult SWSSConfigDBConnector_get_config(SWSSConfigDBConnector configDb, SWSS
                     pairs.push_back(make_pair(field_pair.first, move(field_pair.second)));
                 }
                 kfv_entry.fieldValues = makeFieldValueArray(std::move(pairs));
-
-                table_entries.push_back(kfv_entry);
             }
 
-            // Convert vector to array
-            SWSSKeyOpFieldValues *data = new SWSSKeyOpFieldValues[table_entries.size()];
-            for (size_t i = 0; i < table_entries.size(); i++) {
-                data[i] = table_entries[i];
-            }
-
-            config_table.entries.len = (uint64_t)table_entries.size();
-            config_table.entries.data = data;
-
-            config_tables.push_back(config_table);
+            config_table.entries.len = (uint64_t)table_entries.len;
+            config_table.entries.data = table_entries.release();
         }
 
-        // Convert vector to final array
-        SWSSConfigTable *config_data = new SWSSConfigTable[config_tables.size()];
-        for (size_t i = 0; i < config_tables.size(); i++) {
-            config_data[i] = config_tables[i];
-        }
-
-        outConfig->len = (uint64_t)config_tables.size();
-        outConfig->data = config_data;
+        outConfig->len = (uint64_t)config_tables.len;
+        outConfig->data = config_tables.release();
     });
 }

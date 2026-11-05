@@ -294,7 +294,7 @@ void DBInterface::_subscribe_keyspace_notification(const std::string& dbName)
 {
     SWSS_LOG_DEBUG("Subscribe to keyspace notification");
     auto& client = m_redisClient.at(dbName);
-    DBConnector *pubsub = client.newConnector(0);
+    std::shared_ptr<DBConnector> pubsub(client.newConnector(0));
     pubsub->psubscribe(KEYSPACE_PATTERN);
 
     // Set the timeout of the pubsub channel, so future redisGetReply will be impacted

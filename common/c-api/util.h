@@ -131,6 +131,7 @@ void SWSSConfigMap_free(SWSSConfigMap config);
 #ifdef __cplusplus
 
 #include <boost/cast.hpp>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <iostream>
@@ -172,22 +173,56 @@ static inline SWSSString makeString(std::string &&s) {
     return (struct SWSSStringOpaque *)data_s;
 }
 
+static inline void freeConverted(SWSSFieldValueTuple &entry) {
+    free(const_cast<char *>(entry.field));
+    SWSSString_free(entry.value);
+}
+
+static inline void freeConverted(SWSSKeyOpFieldValues &entry) {
+    free(const_cast<char *>(entry.key));
+    for (uint64_t i = 0; i < entry.fieldValues.len; ++i)
+        freeConverted(entry.fieldValues.data[i]);
+    SWSSFieldValueArray_free(entry.fieldValues);
+}
+
+static inline void freeConverted(SWSSConfigTable &table) {
+    free(const_cast<char *>(table.table_name));
+    for (uint64_t i = 0; i < table.entries.len; ++i)
+        freeConverted(table.entries.data[i]);
+    SWSSKeyOpFieldValuesArray_free(table.entries);
+}
+
+template <class T> struct ConvertedArray {
+    std::unique_ptr<T[]> data;
+    size_t len = 0;
+
+    explicit ConvertedArray(size_t size) : data(new T[size]()) {}
+
+    ~ConvertedArray() {
+        for (size_t i = 0; i < len; ++i)
+            freeConverted(data[i]);
+    }
+
+    T *release() {
+        len = 0;
+        return data.release();
+    }
+};
+
 // T is anything that has a .size() method and which can be iterated over for pair<string, string>
 // eg vector<pair<string, string>>
 template <class T> static inline SWSSFieldValueArray makeFieldValueArray(T &&in) {
-    SWSSFieldValueTuple *data = new SWSSFieldValueTuple[in.size()];
+    ConvertedArray<SWSSFieldValueTuple> data(in.size());
 
-    size_t i = 0;
     for (auto &pair : in) {
-        SWSSFieldValueTuple entry;
+        auto &entry = data.data[data.len++];
         entry.field = strdup(pair.first.c_str());
         entry.value = makeString(std::move(pair.second));
-        data[i++] = entry;
     }
 
     SWSSFieldValueArray out;
     out.len = (uint64_t)in.size();
-    out.data = data;
+    out.data = data.release();
     return out;
 }
 
@@ -202,10 +237,11 @@ static inline SWSSKeyOperation makeKeyOperation(std::string &op) {
 }
 
 static inline SWSSKeyOpFieldValues makeKeyOpFieldValues(swss::KeyOpFieldsValuesTuple &&in) {
+    std::unique_ptr<char, decltype(&free)> key(strdup(kfvKey(in).c_str()), &free);
     SWSSKeyOpFieldValues out;
-    out.key = strdup(kfvKey(in).c_str());
     out.operation = makeKeyOperation(kfvOp(in));
     out.fieldValues = makeFieldValueArray(kfvFieldsValues(in));
+    out.key = key.release();
     return out;
 }
 
@@ -220,15 +256,14 @@ template <class T> static inline T &getReference(std::shared_ptr<T> &t) {
 // T is anything that has a .size() method and which can be iterated over for
 // swss::KeyOpFieldValuesTuple, eg vector or deque
 template <class T> static inline SWSSKeyOpFieldValuesArray makeKeyOpFieldValuesArray(T &&in) {
-    SWSSKeyOpFieldValues *data = new SWSSKeyOpFieldValues[in.size()];
+    ConvertedArray<SWSSKeyOpFieldValues> data(in.size());
 
-    size_t i = 0;
     for (auto &kfv : in)
-        data[i++] = makeKeyOpFieldValues(std::move(getReference(kfv)));
+        data.data[data.len++] = makeKeyOpFieldValues(std::move(getReference(kfv)));
 
     SWSSKeyOpFieldValuesArray out;
     out.len = (uint64_t)in.size();
-    out.data = data;
+    out.data = data.release();
     return out;
 }
 
